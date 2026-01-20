@@ -225,6 +225,38 @@ If you would like to contribute to the project, please read our [contributor doc
 
 JupyterLab follows the official [Jupyter Code of Conduct](https://github.com/jupyter/governance/blob/main/conduct/code_of_conduct.md).
 
+### Installing from source (not yet on PyPI)
+
+If you need to install a version of jupyterlab-git that has not yet been published to PyPI (for example, to test a specific branch or pull request), follow these steps:
+
+```bash
+# Clone the repository (or your fork)
+git clone https://github.com/jupyterlab/jupyterlab-git.git
+cd jupyterlab-git
+
+# Optional: checkout a specific branch or tag
+# git checkout <branch-name>
+
+# Install Node.js dependencies
+jlpm install
+
+# Build the extension
+jlpm run build:prod
+
+# Install the Python package
+pip install .
+
+# Verify the installation
+jupyter labextension list
+jupyter server extension list
+```
+
+After installation, you should see:
+- `@jupyterlab/git` in the JupyterLab extensions list
+- `jupyterlab_git` in the server extensions list with `enabled OK`
+
+**Note:** The frontend and backend versions must match. If you see a version mismatch error, ensure you've run `jlpm run build:prod` before `pip install .` to generate the necessary build artifacts.
+
 ### Development install
 
 Note: You will need NodeJS to build the extension package.
