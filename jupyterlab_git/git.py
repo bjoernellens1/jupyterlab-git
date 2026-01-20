@@ -14,7 +14,7 @@ import traceback
 from enum import Enum, IntEnum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 import nbformat
 import pexpect
@@ -24,6 +24,7 @@ from jupyter_server.utils import ensure_async
 from nbdime import diff_notebooks, merge_notebooks
 
 from .log import get_logger
+from .token_storage import get_token_storage
 
 # Regex pattern to capture (key, value) of Git configuration options.
 # See https://git-scm.com/docs/git-config#_syntax for git var syntax
@@ -230,6 +231,83 @@ class Git:
     def __del__(self):
         if self._GIT_CREDENTIAL_CACHE_DAEMON_PROCESS:
             self._GIT_CREDENTIAL_CACHE_DAEMON_PROCESS.terminate()
+
+    def _get_stored_credentials(self, auth: Optional[Dict]) -> Optional[Dict]:
+        """
+        Get stored credentials if available.
+        
+        Args:
+            auth: Auth dict from the request (may contain use_stored_token flag)
+            
+        Returns:
+            Auth dict with username and token, or None if not available
+        """
+        if not auth:
+            return None
+            
+        # Check if we should use stored token
+        if auth.get("use_stored_token") and auth.get("provider") and auth.get("host"):
+            try:
+                storage = get_token_storage()
+                credential = storage.get_token(auth["provider"], auth["host"])
+                if credential:
+                    return {
+                        "username": credential["username"],
+                        "password": credential["token"],
+                        "cache_credentials": False,
+                    }
+            except Exception as e:
+                get_logger().error(f"Failed to retrieve stored token: {e}")
+        
+        return None
+
+    async def _get_remote_url(self, path: str, remote: str = "origin") -> Optional[str]:
+        """
+        Get the URL of a remote repository.
+        
+        Args:
+            path: Repository path
+            remote: Remote name (default: origin)
+            
+        Returns:
+            Remote URL or None if not found
+        """
+        try:
+            code, output, _ = await self.__execute(
+                ["git", "remote", "get-url", remote], cwd=path
+            )
+            if code == 0:
+                return output.strip()
+        except Exception as e:
+            get_logger().error(f"Failed to get remote URL: {e}")
+        return None
+
+    def _parse_repo_info(self, repo_url: str) -> Optional[Tuple[str, str]]:
+        """
+        Parse repository URL to extract provider and host.
+        
+        Args:
+            repo_url: Repository URL
+            
+        Returns:
+            Tuple of (provider, host) or None if cannot be determined
+        """
+        try:
+            parsed = urlparse(repo_url)
+            host = parsed.netloc or parsed.path.split("/")[0]
+            
+            if "github.com" in host:
+                return ("github", "github.com")
+            elif "gitlab.com" in host:
+                return ("gitlab", "gitlab.com")
+            elif "gitlab" in host:
+                return ("gitlab", host)
+            elif "gitea" in host or "forgejo" in host:
+                return ("gitea", host)
+        except Exception as e:
+            get_logger().error(f"Failed to parse repo URL: {e}")
+        
+        return None
 
     async def __execute(
         self,
@@ -1208,6 +1286,30 @@ class Git:
         for auth.
         """
         env = os.environ.copy()
+        
+        # Try to use stored credentials first
+        stored_auth = self._get_stored_credentials(auth)
+        if stored_auth:
+            auth = stored_auth
+        # If no auth provided, try to find stored credentials based on remote URL
+        elif not auth:
+            remote_url = await self._get_remote_url(path, "origin")
+            if remote_url:
+                repo_info = self._parse_repo_info(remote_url)
+                if repo_info:
+                    provider, host = repo_info
+                    try:
+                        storage = get_token_storage()
+                        credential = storage.get_token(provider, host)
+                        if credential:
+                            auth = {
+                                "username": credential["username"],
+                                "password": credential["token"],
+                                "cache_credentials": False,
+                            }
+                    except Exception as e:
+                        get_logger().error(f"Failed to retrieve stored token: {e}")
+        
         if auth:
             if auth.get("cache_credentials"):
                 await self.ensure_credential_helper(path)
@@ -1276,6 +1378,30 @@ class Git:
         command.extend([remote, branch])
 
         env = os.environ.copy()
+        
+        # Try to use stored credentials first
+        stored_auth = self._get_stored_credentials(auth)
+        if stored_auth:
+            auth = stored_auth
+        # If no auth provided, try to find stored credentials based on remote URL
+        elif not auth:
+            remote_url = await self._get_remote_url(path, remote)
+            if remote_url:
+                repo_info = self._parse_repo_info(remote_url)
+                if repo_info:
+                    provider, host = repo_info
+                    try:
+                        storage = get_token_storage()
+                        credential = storage.get_token(provider, host)
+                        if credential:
+                            auth = {
+                                "username": credential["username"],
+                                "password": credential["token"],
+                                "cache_credentials": False,
+                            }
+                    except Exception as e:
+                        get_logger().error(f"Failed to retrieve stored token: {e}")
+        
         if auth:
             if auth.get("cache_credentials"):
                 await self.ensure_credential_helper(path)

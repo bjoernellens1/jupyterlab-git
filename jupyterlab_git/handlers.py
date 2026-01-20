@@ -26,6 +26,8 @@ from .git import DEFAULT_REMOTE_NAME, Git, RebaseAction
 from .log import get_logger
 
 from .ssh import SSH
+from .auth_providers import get_provider
+from .token_storage import get_token_storage
 
 # Git configuration options exposed through the REST API
 ALLOWED_OPTIONS = ["user.name", "user.email"]
@@ -1137,6 +1139,457 @@ class SshHostHandler(SSHHandler):
         self.ssh.add_host(hostname)
 
 
+class AuthStartFlowHandler(GitHandler):
+    """
+    Handler to start OAuth device flow for authentication providers.
+    """
+
+    @tornado.web.authenticated
+    async def post(self):
+        """
+        POST request to start device flow for a provider.
+        
+        Input format:
+            {
+              'provider': 'github' | 'gitlab' | 'gitea',
+              'base_url': 'https://gitlab.example.com' (optional, for self-hosted)
+            }
+        """
+        data = self.get_json_body()
+        provider_name = data.get("provider")
+        base_url = data.get("base_url")
+
+        try:
+            kwargs = {}
+            if base_url:
+                kwargs["base_url"] = base_url
+
+            provider = get_provider(provider_name, **kwargs)
+            if not provider:
+                self.set_status(400)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": -1,
+                            "message": f"Unknown provider: {provider_name}",
+                        }
+                    )
+                )
+                return
+
+            flow_data = await provider.start_device_flow()
+            self.set_status(200)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": 0,
+                        "data": flow_data,
+                    }
+                )
+            )
+        except Exception as e:
+            self.log.error(f"Failed to start auth flow: {e}")
+            self.set_status(500)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": str(e),
+                    }
+                )
+            )
+
+
+class AuthPollTokenHandler(GitHandler):
+    """
+    Handler to poll for access token after user authorization.
+    """
+
+    @tornado.web.authenticated
+    async def post(self):
+        """
+        POST request to poll for token.
+        
+        Input format:
+            {
+              'provider': 'github' | 'gitlab' | 'gitea',
+              'device_code': '<device_code>',
+              'interval': 5,
+              'base_url': 'https://gitlab.example.com' (optional, for self-hosted)
+            }
+        """
+        data = self.get_json_body()
+        provider_name = data.get("provider")
+        device_code = data.get("device_code")
+        interval = data.get("interval", 5)
+        base_url = data.get("base_url")
+
+        try:
+            kwargs = {}
+            if base_url:
+                kwargs["base_url"] = base_url
+
+            provider = get_provider(provider_name, **kwargs)
+            if not provider:
+                self.set_status(400)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": -1,
+                            "message": f"Unknown provider: {provider_name}",
+                        }
+                    )
+                )
+                return
+
+            token = await provider.poll_for_token(device_code, interval)
+            if token:
+                # Validate and get username
+                is_valid, username = await provider.validate_token(token)
+                if is_valid:
+                    # Store token
+                    host = provider.get_git_credential_url("")
+                    if not host:
+                        # Extract from base_url or use default
+                        if provider_name == "github":
+                            host = "github.com"
+                        elif provider_name == "gitlab":
+                            host = "gitlab.com" if not base_url else base_url.replace("https://", "").replace("http://", "")
+                        elif provider_name == "gitea":
+                            host = base_url.replace("https://", "").replace("http://", "") if base_url else "gitea.com"
+
+                    storage = get_token_storage()
+                    storage.store_token(provider_name, host, username, token)
+
+                    self.set_status(200)
+                    self.finish(
+                        json.dumps(
+                            {
+                                "code": 0,
+                                "data": {
+                                    "username": username,
+                                    "host": host,
+                                    "provider": provider_name,
+                                },
+                            }
+                        )
+                    )
+                else:
+                    self.set_status(500)
+                    self.finish(
+                        json.dumps(
+                            {
+                                "code": -1,
+                                "message": "Token validation failed",
+                            }
+                        )
+                    )
+            else:
+                self.set_status(408)  # Request Timeout
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": -1,
+                            "message": "Authorization timed out or was denied",
+                        }
+                    )
+                )
+        except Exception as e:
+            self.log.error(f"Failed to poll for token: {e}")
+            self.set_status(500)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": str(e),
+                    }
+                )
+            )
+
+
+class AuthStoreTokenHandler(GitHandler):
+    """
+    Handler to manually store a token (for Gitea/Forgejo).
+    """
+
+    @tornado.web.authenticated
+    async def post(self):
+        """
+        POST request to store a token.
+        
+        Input format:
+            {
+              'provider': 'github' | 'gitlab' | 'gitea',
+              'host': 'github.com',
+              'username': 'user',
+              'token': '<access_token>'
+            }
+        """
+        data = self.get_json_body()
+        provider_name = data.get("provider")
+        host = data.get("host")
+        username = data.get("username")
+        token = data.get("token")
+
+        if not all([provider_name, host, username, token]):
+            self.set_status(400)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": "Missing required fields",
+                    }
+                )
+            )
+            return
+
+        try:
+            # Validate token with provider
+            base_url = f"https://{host}" if not host.startswith("http") else host
+            provider = get_provider(provider_name, base_url=base_url)
+            if not provider:
+                self.set_status(400)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": -1,
+                            "message": f"Unknown provider: {provider_name}",
+                        }
+                    )
+                )
+                return
+
+            is_valid, validated_username = await provider.validate_token(token)
+            if not is_valid:
+                self.set_status(400)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": -1,
+                            "message": "Invalid token",
+                        }
+                    )
+                )
+                return
+
+            # Store token
+            storage = get_token_storage()
+            success = storage.store_token(provider_name, host, username, token)
+
+            if success:
+                self.set_status(200)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": 0,
+                            "data": {
+                                "username": validated_username or username,
+                                "host": host,
+                                "provider": provider_name,
+                            },
+                        }
+                    )
+                )
+            else:
+                self.set_status(500)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": -1,
+                            "message": "Failed to store token",
+                        }
+                    )
+                )
+        except Exception as e:
+            self.log.error(f"Failed to store token: {e}")
+            self.set_status(500)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": str(e),
+                    }
+                )
+            )
+
+
+class AuthGetTokenHandler(GitHandler):
+    """
+    Handler to retrieve stored token for a provider/host.
+    """
+
+    @tornado.web.authenticated
+    async def post(self):
+        """
+        POST request to get token.
+        
+        Input format:
+            {
+              'provider': 'github' | 'gitlab' | 'gitea',
+              'host': 'github.com'
+            }
+        """
+        data = self.get_json_body()
+        provider_name = data.get("provider")
+        host = data.get("host")
+
+        if not all([provider_name, host]):
+            self.set_status(400)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": "Missing required fields",
+                    }
+                )
+            )
+            return
+
+        try:
+            storage = get_token_storage()
+            credential = storage.get_token(provider_name, host)
+
+            if credential:
+                self.set_status(200)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": 0,
+                            "data": {
+                                "username": credential.get("username"),
+                                "has_token": True,
+                            },
+                        }
+                    )
+                )
+            else:
+                self.set_status(404)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": -1,
+                            "message": "No token found",
+                        }
+                    )
+                )
+        except Exception as e:
+            self.log.error(f"Failed to get token: {e}")
+            self.set_status(500)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": str(e),
+                    }
+                )
+            )
+
+
+class AuthDeleteTokenHandler(GitHandler):
+    """
+    Handler to delete stored token (logout).
+    """
+
+    @tornado.web.authenticated
+    async def post(self):
+        """
+        POST request to delete token.
+        
+        Input format:
+            {
+              'provider': 'github' | 'gitlab' | 'gitea',
+              'host': 'github.com'
+            }
+        """
+        data = self.get_json_body()
+        provider_name = data.get("provider")
+        host = data.get("host")
+
+        if not all([provider_name, host]):
+            self.set_status(400)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": "Missing required fields",
+                    }
+                )
+            )
+            return
+
+        try:
+            storage = get_token_storage()
+            success = storage.delete_token(provider_name, host)
+
+            if success:
+                self.set_status(200)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": 0,
+                            "message": "Token deleted successfully",
+                        }
+                    )
+                )
+            else:
+                self.set_status(500)
+                self.finish(
+                    json.dumps(
+                        {
+                            "code": -1,
+                            "message": "Failed to delete token",
+                        }
+                    )
+                )
+        except Exception as e:
+            self.log.error(f"Failed to delete token: {e}")
+            self.set_status(500)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": str(e),
+                    }
+                )
+            )
+
+
+class AuthListTokensHandler(GitHandler):
+    """
+    Handler to list all stored tokens.
+    """
+
+    @tornado.web.authenticated
+    async def get(self):
+        """
+        GET request to list all stored tokens.
+        """
+        try:
+            storage = get_token_storage()
+            tokens = storage.list_tokens()
+
+            self.set_status(200)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": 0,
+                        "data": tokens,
+                    }
+                )
+            )
+        except Exception as e:
+            self.log.error(f"Failed to list tokens: {e}")
+            self.set_status(500)
+            self.finish(
+                json.dumps(
+                    {
+                        "code": -1,
+                        "message": str(e),
+                    }
+                )
+            )
+
+
 def setup_handlers(web_app):
     """
     Setups all of the git command handlers.
@@ -1188,6 +1641,12 @@ def setup_handlers(web_app):
         ("/diffnotebook", GitDiffNotebookHandler),
         ("/settings", GitSettingsHandler),
         ("/known_hosts", SshHostHandler),
+        ("/auth/start_flow", AuthStartFlowHandler),
+        ("/auth/poll_token", AuthPollTokenHandler),
+        ("/auth/store_token", AuthStoreTokenHandler),
+        ("/auth/get_token", AuthGetTokenHandler),
+        ("/auth/delete_token", AuthDeleteTokenHandler),
+        ("/auth/list_tokens", AuthListTokensHandler),
     ]
 
     # add the baseurl to our paths

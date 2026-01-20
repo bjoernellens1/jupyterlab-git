@@ -607,7 +607,7 @@ export class FileList extends React.Component<IFileListProps, IFileListState> {
       return (
         <div className={fileListWrapperClass}>
           <AutoSizer disableWidth={true}>
-            {({ height }) => (
+            {({ height }: { height: number }) => (
               <>
                 {this._renderUnmerged(unmergedFiles, height, false)}
                 {this._renderRemoteChanged(remoteChangedFiles, height)}
@@ -660,7 +660,7 @@ export class FileList extends React.Component<IFileListProps, IFileListState> {
           onContextMenu={event => event.preventDefault()}
         >
           <AutoSizer disableWidth={true}>
-            {({ height }) => (
+            {({ height }: { height: number }) => (
               <>
                 {this._renderUnmerged(unmergedFiles, height)}
                 {this._renderRemoteChanged(remoteChangedFiles, height)}

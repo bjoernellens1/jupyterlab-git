@@ -29,6 +29,7 @@ dependencies = [
     "packaging",
     "pexpect",
     "traitlets~=5.0",
+    "keyring>=23.0.0",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 

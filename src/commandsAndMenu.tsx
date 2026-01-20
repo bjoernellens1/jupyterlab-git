@@ -302,6 +302,49 @@ export function addCommands(
     }
   });
 
+  commands.addCommand(CommandIDs.gitManageAccounts, {
+    label: trans.__('Manage Accounts'),
+    caption: trans.__('Manage connected accounts for Git authentication'),
+    execute: () => {
+      const widgetId = 'git-dialog-ManageAccounts';
+      let anchor = document.querySelector<HTMLDivElement>(`#${widgetId}`);
+      if (!anchor) {
+        anchor = document.createElement('div');
+        anchor.id = widgetId;
+        document.body.appendChild(anchor);
+      }
+
+      // Lazy import AccountManager to avoid circular dependencies
+      import('./components/AccountManager').then(({ AccountManager }) => {
+        const dialog = ReactWidget.create(
+          <div className="jp-Git-account-manager-container">
+            <AccountManager
+              trans={trans}
+              onAccountChange={() => {
+                // Refresh git model to re-evaluate credentials
+                gitModel.refresh().catch(console.error);
+              }}
+            />
+            <button
+              className="jp-Button jp-mod-styled"
+              onClick={() => {
+                dialog.dispose();
+                if (anchor && anchor.parentNode) {
+                  anchor.parentNode.removeChild(anchor);
+                }
+              }}
+              style={{ marginTop: '20px' }}
+            >
+              {trans.__('Close')}
+            </button>
+          </div>
+        );
+
+        Widget.attach(dialog, anchor!);
+      });
+    }
+  });
+
   async function showGitignore(error: any) {
     const model = new CodeEditor.Model({});
     const repoPath = gitModel.getRelativeFilePath();
@@ -1840,6 +1883,10 @@ export function createGitMenu(
       menu.addItem({ command, args: { force: true } });
     }
   });
+
+  menu.addItem({ type: 'separator' });
+
+  menu.addItem({ command: CommandIDs.gitManageAccounts });
 
   menu.addItem({ type: 'separator' });
 
