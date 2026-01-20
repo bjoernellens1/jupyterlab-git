@@ -327,7 +327,12 @@ export function addCommands(
             />
             <button
               className="jp-Button jp-mod-styled"
-              onClick={() => dialog.dispose()}
+              onClick={() => {
+                dialog.dispose();
+                if (anchor && anchor.parentNode) {
+                  anchor.parentNode.removeChild(anchor);
+                }
+              }}
               style={{ marginTop: '20px' }}
             >
               {trans.__('Close')}
@@ -335,7 +340,7 @@ export function addCommands(
           </div>
         );
 
-        Widget.attach(dialog, anchor);
+        Widget.attach(dialog, anchor!);
       });
     }
   });

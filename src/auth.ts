@@ -31,6 +31,7 @@ export namespace Auth {
     host: string;
     username: string;
     has_token?: boolean;
+    storage?: string;
   }
 
   /**
