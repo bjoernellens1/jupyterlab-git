@@ -54,6 +54,20 @@ or with _conda_:
 conda remove jupyterlab-git
 ```
 
+## Features
+
+### Permanent Sign-In (New! ✨)
+
+The extension now supports permanent sign-in for GitHub, GitLab, and Gitea/Forgejo, providing a seamless authentication experience similar to VS Code:
+
+- **One-time sign-in**: Authenticate once and your credentials are securely stored
+- **Automatic authentication**: Push, pull, and fetch operations use stored tokens automatically
+- **Multiple providers**: Support for GitHub, GitLab, and Gitea/Forgejo
+- **Secure storage**: Tokens are stored in your system's keyring (Keychain, Credential Manager, etc.)
+- **Easy management**: View and manage connected accounts from the Git menu
+
+To get started, open the **Git** menu and select **Manage Accounts**. For detailed information, see the [Permanent Sign-In Guide](docs/permanent-signin.md).
+
 ## Settings
 
 ### Authentication to remote repository hosts
@@ -64,6 +78,17 @@ This extension tries to handle credentials for HTTP(S) connections (if you don't
 
 > For Windows users, it is recommended to install [git for windows](https://gitforwindows.org/). It will automatically set up a credential manager.
 > In order to connect to a remote host, it is recommended to use SSH.
+
+#### Permanent Sign-In (Recommended)
+
+The easiest way to authenticate is using the new **Permanent Sign-In** feature:
+
+1. Open the **Git** menu and select **Manage Accounts**
+2. Click "Sign in with GitHub" (or GitLab/Gitea)
+3. Follow the authentication flow
+4. Your credentials will be securely stored and used automatically
+
+See the [Permanent Sign-In Guide](docs/permanent-signin.md) for more details.
 
 #### HTTP(S) protocol
 
