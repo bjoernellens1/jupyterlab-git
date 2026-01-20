@@ -1,0 +1,252 @@
+/*
+ * Styles for authentication dialog and account management
+ */
+
+/* Authentication Dialog */
+.jp-Git-auth-dialog {
+  padding: 20px;
+  min-width: 400px;
+  min-height: 200px;
+}
+
+.jp-Git-auth-dialog-widget {
+  overflow: visible;
+}
+
+.jp-Git-auth-loading,
+.jp-Git-auth-device-code,
+.jp-Git-auth-polling,
+.jp-Git-auth-manual-token,
+.jp-Git-auth-success,
+.jp-Git-auth-error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.jp-Git-auth-device-code h3,
+.jp-Git-auth-manual-token h3,
+.jp-Git-auth-error-container h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.jp-Git-auth-code-box {
+  background: var(--jp-layout-color2);
+  padding: 20px;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.jp-Git-auth-code {
+  font-size: 24px;
+  font-weight: bold;
+  font-family: monospace;
+  letter-spacing: 4px;
+  color: var(--jp-ui-font-color1);
+  text-align: center;
+}
+
+.jp-Git-auth-link {
+  color: var(--jp-brand-color1);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.jp-Git-auth-link:hover {
+  text-decoration: underline;
+}
+
+.jp-Git-auth-polling {
+  padding: 30px 0;
+}
+
+.jp-Git-auth-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--jp-layout-color2);
+  border-top-color: var(--jp-brand-color1);
+  border-radius: 50%;
+  animation: jp-Git-auth-spin 1s linear infinite;
+}
+
+@keyframes jp-Git-auth-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.jp-Git-auth-hint {
+  font-size: 12px;
+  color: var(--jp-ui-font-color2);
+  text-align: center;
+}
+
+.jp-Git-auth-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.jp-Git-auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.jp-Git-auth-form label span {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.jp-Git-auth-form input {
+  padding: 8px;
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  background: var(--jp-layout-color1);
+  color: var(--jp-ui-font-color1);
+  font-size: 13px;
+}
+
+.jp-Git-auth-form input:focus {
+  outline: none;
+  border-color: var(--jp-brand-color1);
+}
+
+.jp-Git-auth-success {
+  padding: 30px 0;
+}
+
+.jp-Git-auth-success-icon {
+  width: 60px;
+  height: 60px;
+  background: var(--jp-success-color1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: white;
+}
+
+.jp-Git-auth-error {
+  color: var(--jp-error-color1);
+  padding: 10px;
+  background: var(--jp-error-color3);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* Account Manager */
+.jp-Git-account-manager {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.jp-Git-account-manager-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color1);
+}
+
+.jp-Git-account-manager-loading,
+.jp-Git-account-manager-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--jp-ui-font-color2);
+}
+
+.jp-Git-account-manager-error {
+  padding: 10px;
+  background: var(--jp-error-color3);
+  color: var(--jp-error-color1);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.jp-Git-account-manager-hint {
+  font-size: 12px;
+  color: var(--jp-ui-font-color2);
+  margin-top: 10px;
+}
+
+.jp-Git-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jp-Git-account-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: var(--jp-layout-color2);
+  border-radius: 6px;
+  border: 1px solid var(--jp-border-color1);
+}
+
+.jp-Git-account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.jp-Git-account-provider {
+  font-weight: 600;
+  color: var(--jp-ui-font-color1);
+  font-size: 14px;
+}
+
+.jp-Git-account-username {
+  font-size: 13px;
+  color: var(--jp-ui-font-color2);
+}
+
+.jp-Git-account-storage {
+  font-size: 11px;
+  color: var(--jp-ui-font-color3);
+}
+
+.jp-Git-account-manager-actions {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--jp-border-color1);
+}
+
+.jp-Git-account-manager-actions h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color1);
+}
+
+.jp-Git-account-manager-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jp-Git-account-manager-buttons button {
+  justify-content: flex-start;
+}
+
+/* Button styles */
+.jp-Button.jp-mod-warn {
+  background: var(--jp-error-color1);
+  color: white;
+}
+
+.jp-Button.jp-mod-warn:hover {
+  background: var(--jp-error-color0);
+}
