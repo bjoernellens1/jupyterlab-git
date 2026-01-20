@@ -1245,6 +1245,9 @@ export namespace Git {
     username: string;
     password: string;
     cache_credentials?: boolean;
+    use_stored_token?: boolean;
+    provider?: string;
+    host?: string;
   }
 
   /**
